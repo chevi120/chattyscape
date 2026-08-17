@@ -1,0 +1,12 @@
+@import url(https://db.onlinewebfonts.com/c/fa6584b49f2dbb17b7483544bfa0b654?family=GT+Pressura+Pro+Bold);
+@font-face {
+  font-family: 'Bariol';
+  src: url('https://www.scape.com.au/wp-content/themes/scape-student/assets/fonts/Bariol-Regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+}
+@import 'tailwindcss' source(none);
+@source '../../**/*.{js,ts,jsx,tsx}';
+@import 'tw-animate-css';
+@import './default_theme.css';
+@import './globals.css';
