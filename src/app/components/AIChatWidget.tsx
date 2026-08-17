@@ -42,6 +42,8 @@ export function AIChatWidget({
   const sfReady = useRef(false);
   const pendingLaunch = useRef(false);
 
+  const scriptLoading = useRef(false);
+
   const doLaunch = () => {
     const esb = (window as any).embeddedservice_bootstrap;
     if (esb?.utilAPI?.launchChat) {
@@ -55,9 +57,10 @@ export function AIChatWidget({
     if (sfBtn) sfBtn.click();
   };
 
-  // Load Salesforce Embedded Messaging
-  useEffect(() => {
-    if (document.getElementById('sf-embedded-script')) return;
+  // Load Salesforce Embedded Messaging on demand, the first time the user opens the AI agent chat
+  const loadEmbeddedMessaging = () => {
+    if (document.getElementById('sf-embedded-script') || scriptLoading.current) return;
+    scriptLoading.current = true;
 
     window.addEventListener('onEmbeddedMessagingReady', () => {
       sfReady.current = true;
@@ -87,7 +90,7 @@ export function AIChatWidget({
     };
     script.onerror = () => console.error('Failed to load Salesforce script — check the URL and network');
     document.body.appendChild(script);
-  }, []);
+  };
 
   const launchSalesforceChat = () => {
     setIsOpen(false);
@@ -96,6 +99,7 @@ export function AIChatWidget({
     } else {
       // SF not ready yet — queue it, will fire on onEmbeddedMessagingReady
       pendingLaunch.current = true;
+      loadEmbeddedMessaging();
     }
   };
 
