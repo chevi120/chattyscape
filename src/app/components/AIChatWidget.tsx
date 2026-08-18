@@ -46,9 +46,13 @@ export function AIChatWidget({
 
   const doLaunch = () => {
     const esb = (window as any).embeddedservice_bootstrap;
-    if (esb?.utilAPI?.launchChat) {
-      esb.utilAPI.launchChat();
-      return;
+    try {
+      if (esb?.utilAPI?.launchChat) {
+        esb.utilAPI.launchChat();
+        return;
+      }
+    } catch (err) {
+      console.error('launchChat failed, falling back to clicking the native button:', err);
     }
     // Fallback: find SF's own rendered button and click it
     const sfBtn = document.querySelector<HTMLElement>(
@@ -62,7 +66,10 @@ export function AIChatWidget({
     if (document.getElementById('sf-embedded-script') || scriptLoading.current) return;
     scriptLoading.current = true;
 
-    window.addEventListener('onEmbeddedMessagingReady', () => {
+    // launchChat() throws until Salesforce's own button has actually been created —
+    // hideChatButtonOnLoad would stop it from ever being created, so we let it render
+    // and hide it visually via CSS (.embeddedServiceHelpButton) instead.
+    window.addEventListener('onEmbeddedMessagingButtonCreated', () => {
       sfReady.current = true;
       // If user clicked before SF was ready, launch now
       if (pendingLaunch.current) {
@@ -78,8 +85,6 @@ export function AIChatWidget({
     script.onload = () => {
       try {
         (window as any).embeddedservice_bootstrap.settings.language = 'en_US';
-        // We launch the chat from our own Chatty button, so hide Salesforce's default launcher button
-        (window as any).embeddedservice_bootstrap.settings.hideChatButtonOnLoad = true;
         (window as any).embeddedservice_bootstrap.init(
           '00DBn000005CYJD',
           'Chatty_v2',
@@ -99,7 +104,7 @@ export function AIChatWidget({
     if (sfReady.current) {
       doLaunch();
     } else {
-      // SF not ready yet — queue it, will fire on onEmbeddedMessagingReady
+      // SF not ready yet — queue it, will fire on onEmbeddedMessagingButtonCreated
       pendingLaunch.current = true;
       loadEmbeddedMessaging();
     }
