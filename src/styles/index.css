@@ -17,3 +17,10 @@
 @import 'tw-animate-css';
 @import './default_theme.css';
 @import './globals.css';
+
+/* Salesforce's default Embedded Messaging launcher ("Ask Me Anything") is
+   redundant since Chatty's own floating button opens the chat, and it can
+   reappear after minimizing even with hideChatButtonOnLoad set — hide it. */
+.embeddedServiceHelpButton {
+  display: none !important;
+}

@@ -78,6 +78,8 @@ export function AIChatWidget({
     script.onload = () => {
       try {
         (window as any).embeddedservice_bootstrap.settings.language = 'en_US';
+        // We launch the chat from our own Chatty button, so hide Salesforce's default launcher button
+        (window as any).embeddedservice_bootstrap.settings.hideChatButtonOnLoad = true;
         (window as any).embeddedservice_bootstrap.init(
           '00DBn000005CYJD',
           'Chatty_v2',
