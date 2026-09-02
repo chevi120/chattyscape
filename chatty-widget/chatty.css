@@ -1,0 +1,22 @@
+/* Fonts used by AIChatWidget.tsx */
+@font-face {
+  font-family: 'Bariol';
+  src: url('./fonts/Bariol-Regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'GT Pressura Pro';
+  src: url('./fonts/GTPressuraPro-Bold.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Salesforce's default Embedded Messaging launcher ("Ask Me Anything") is
+   redundant since Chatty's own floating button opens the chat, and it can
+   reappear after minimizing even with hideChatButtonOnLoad set — hide it. */
+.embeddedServiceHelpButton {
+  display: none !important;
+}
