@@ -19,6 +19,8 @@
    reappear after minimizing even with hideChatButtonOnLoad set — hide it. */
 .embeddedServiceHelpButton,
 #embeddedMessagingConversationButton,
-.embeddedMessagingConversationButton {
+.embeddedMessagingConversationButton,
+[id^="embeddedMessagingConversationButton"],
+[class*="embeddedMessagingConversationButton"] {
   display: none !important;
 }

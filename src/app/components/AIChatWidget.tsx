@@ -69,8 +69,21 @@ export function AIChatWidget({
     // Salesforce's own launcher ("Ask me anything") is hidden on load via
     // hideChatButtonOnLoad and, as a fallback, via CSS. Either the button-created
     // or the ready event unlocks launchChat().
+    const hideLauncher = () => {
+      try {
+        (window as any).embeddedservice_bootstrap?.utilAPI?.hideChatButton?.();
+      } catch (err) {
+        console.error('hideChatButton failed:', err);
+      }
+    };
+
+    // The launcher comes back after the chat is minimized or closed — hide it again.
+    window.addEventListener('onEmbeddedMessagingWindowMinimized', hideLauncher);
+    window.addEventListener('onEmbeddedMessagingWindowClosed', hideLauncher);
+
     const markReady = () => {
       sfReady.current = true;
+      hideLauncher();
       // If user clicked before SF was ready, launch now
       if (pendingLaunch.current) {
         pendingLaunch.current = false;
