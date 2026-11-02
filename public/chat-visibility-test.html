@@ -1,0 +1,74 @@
+<html>
+<head>
+    <title>Enhanced Chat Visibility Test</title>
+
+    <script type="text/javascript">
+
+        var messagingReady = false;
+
+        window.addEventListener("onEmbeddedMessagingButtonCreated", function() {
+            messagingReady = true;
+            console.log("Chat launcher created");
+        });
+
+        window.addEventListener("onEmbeddedMessagingReady", function() {
+            messagingReady = true;
+            console.log("Embedded messaging ready");
+        });
+
+        window.addEventListener("onEmbeddedMessagingWindowClosed", function() {
+            console.log("Chat window closed");
+        });
+
+        window.addEventListener("onEmbeddedMessagingWindowMinimized", function() {
+            console.log("Chat window minimized");
+        });
+
+        function showChat() {
+            if (messagingReady) {
+                embeddedservice_bootstrap.utilAPI.showChatButton();
+            } else {
+                console.log("Chat launcher not ready");
+            }
+        }
+
+        function initEmbeddedMessaging() {
+            try {
+                embeddedservice_bootstrap.settings.language = 'en_US';
+
+                // Set initial launcher state to hidden
+                embeddedservice_bootstrap.settings.hideChatButtonOnLoad = true;
+
+                embeddedservice_bootstrap.init(
+                    '00DBn000005CYJD',
+                    'Chatty_v2',
+                    'https://scapeau--innscpedev.sandbox.my.site.com/ESWChattyv21781499949497',
+                    {
+                        scrt2URL: 'https://scapeau--innscpedev.sandbox.my.salesforce-scrt.com'
+                    }
+                );
+
+            } catch (err) {
+                console.error('Error loading Embedded Messaging:', err);
+            }
+        }
+
+    </script>
+
+    <script
+        type="text/javascript"
+        src="https://scapeau--innscpedev.sandbox.my.site.com/ESWChattyv21781499949497/assets/js/bootstrap.min.js"
+        onload="initEmbeddedMessaging()">
+    </script>
+
+</head>
+
+<body>
+    <h2>Enhanced Chat Visibility Test</h2>
+
+    <button type="button" onclick="showChat()">
+        Show Chat
+    </button>
+
+</body>
+</html>
