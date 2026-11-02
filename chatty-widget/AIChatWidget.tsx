@@ -66,17 +66,19 @@ export function AIChatWidget({
     if (document.getElementById('sf-embedded-script') || scriptLoading.current) return;
     scriptLoading.current = true;
 
-    // launchChat() throws until Salesforce's own button has actually been created —
-    // hideChatButtonOnLoad would stop it from ever being created, so we let it render
-    // and hide it visually via CSS (.embeddedServiceHelpButton) instead.
-    window.addEventListener('onEmbeddedMessagingButtonCreated', () => {
+    // Salesforce's own launcher ("Ask me anything") is hidden on load via
+    // hideChatButtonOnLoad and, as a fallback, via CSS. Either the button-created
+    // or the ready event unlocks launchChat().
+    const markReady = () => {
       sfReady.current = true;
       // If user clicked before SF was ready, launch now
       if (pendingLaunch.current) {
         pendingLaunch.current = false;
         doLaunch();
       }
-    });
+    };
+    window.addEventListener('onEmbeddedMessagingButtonCreated', markReady);
+    window.addEventListener('onEmbeddedMessagingReady', markReady);
 
     const script = document.createElement('script');
     script.id = 'sf-embedded-script';
@@ -85,6 +87,7 @@ export function AIChatWidget({
     script.onload = () => {
       try {
         (window as any).embeddedservice_bootstrap.settings.language = 'en_US';
+        (window as any).embeddedservice_bootstrap.settings.hideChatButtonOnLoad = true;
         (window as any).embeddedservice_bootstrap.init(
           '00DBn000005CYJD',
           'Chatty_v2',
