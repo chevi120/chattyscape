@@ -14,6 +14,30 @@ interface AIChatWidgetProps {
 
 type CtaId = "whatsapp" | "ai" | "faq" | "contact";
 
+// Class that marks the Salesforce chat window as open.
+// Without it, all Salesforce UI (frame, native button, minimized "Ask me anything") is hidden,
+// so the custom launcher is the only thing visitors see.
+const SF_OPEN_CLASS = "sf-chat-open";
+const SF_STYLE_ID = "sf-chat-hide-styles";
+const SF_HIDE_CSS = `
+  html:not(.${SF_OPEN_CLASS}) #embeddedMessagingFrame,
+  #embeddedMessagingFrame.minimized,
+  #embeddedMessagingFrame.state-minimized,
+  #embeddedMessagingConversationButton,
+  [id^="embeddedMessagingConversationButton"],
+  [class*="embeddedMessagingConversationButton"],
+  .embeddedMessagingConversationButtonWrapper,
+  .embeddedServiceHelpButton {
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+`;
+
+function setSfOpenClass(open: boolean) {
+  document.documentElement.classList.toggle(SF_OPEN_CLASS, open);
+}
+
 function ctaStyle(active: boolean, hovered: boolean) {
   const on = active || hovered;
   return {
@@ -32,66 +56,79 @@ export function AIChatWidget({
   title = "Hello, have a question? Let's chat.",
   whatsappHref = "https://api.whatsapp.com/send?phone=61490392274",
 }: AIChatWidgetProps) {
-  const [isOpen, setIsOpen]       = useState(false);
-  const [view, setView]           = useState<"menu" | "contact">("menu");
+  const [isOpen, setIsOpen]           = useState(false);
+  const [view, setView]               = useState<"menu" | "contact">("menu");
   const [showTooltip, setShowTooltip] = useState(false);
-  const [activeCta, setActiveCta]   = useState<CtaId>("whatsapp");
-  const [hoveredCta, setHoveredCta] = useState<CtaId | null>(null);
+  const [activeCta, setActiveCta]     = useState<CtaId>("whatsapp");
+  const [hoveredCta, setHoveredCta]   = useState<CtaId | null>(null);
+  // True while the Salesforce chat window is open; the custom launcher hides then.
+  const [sfOpen, setSfOpen]           = useState(false);
   const widgetRef = useRef<HTMLDivElement>(null);
 
   const sfReady = useRef(false);
   const pendingLaunch = useRef(false);
-
   const scriptLoading = useRef(false);
+
+  const openSf = (open: boolean) => {
+    setSfOpenClass(open);
+    setSfOpen(open);
+  };
 
   const doLaunch = () => {
     const esb = (window as any).embeddedservice_bootstrap;
+    openSf(true); // reveal the Salesforce frame before it opens
     try {
-      if (esb?.utilAPI?.launchChat) {
-        esb.utilAPI.launchChat();
-        return;
+      const result = esb?.utilAPI?.launchChat?.();
+      if (result && typeof result.catch === 'function') {
+        result.catch((err: unknown) => {
+          console.error('launchChat failed:', err);
+          openSf(false);
+        });
       }
     } catch (err) {
-      console.error('launchChat failed, falling back to clicking the native button:', err);
+      console.error('launchChat failed:', err);
+      openSf(false);
     }
-    // Fallback: find SF's own rendered button and click it
-    const sfBtn = document.querySelector<HTMLElement>(
-      '.embeddedServiceHelpButton button, button.helpButton, [data-testid="embedded-messaging-fab"]'
-    );
-    if (sfBtn) sfBtn.click();
   };
 
-  // Load Salesforce Embedded Messaging on demand, the first time the user opens the AI agent chat
-  const loadEmbeddedMessaging = () => {
-    if (document.getElementById('sf-embedded-script') || scriptLoading.current) return;
-    scriptLoading.current = true;
+  // Inject the hiding CSS and listen for Salesforce window events once.
+  useEffect(() => {
+    if (!document.getElementById(SF_STYLE_ID)) {
+      const style = document.createElement('style');
+      style.id = SF_STYLE_ID;
+      style.textContent = SF_HIDE_CSS;
+      document.head.appendChild(style);
+    }
 
-    // Salesforce's own launcher ("Ask me anything") is hidden on load via
-    // hideChatButtonOnLoad and, as a fallback, via CSS. Either the button-created
-    // or the ready event unlocks launchChat().
-    const hideLauncher = () => {
-      try {
-        (window as any).embeddedservice_bootstrap?.utilAPI?.hideChatButton?.();
-      } catch (err) {
-        console.error('hideChatButton failed:', err);
-      }
-    };
-
-    // The launcher comes back after the chat is minimized or closed — hide it again.
-    window.addEventListener('onEmbeddedMessagingWindowMinimized', hideLauncher);
-    window.addEventListener('onEmbeddedMessagingWindowClosed', hideLauncher);
-
-    const markReady = () => {
+    // launchChat() only works once Salesforce has created its (hidden) button,
+    // so onEmbeddedMessagingButtonCreated is the only readiness signal.
+    const onReady = () => {
       sfReady.current = true;
-      hideLauncher();
-      // If user clicked before SF was ready, launch now
+      // If the user clicked before Salesforce was ready, launch now
       if (pendingLaunch.current) {
         pendingLaunch.current = false;
         doLaunch();
       }
     };
-    window.addEventListener('onEmbeddedMessagingButtonCreated', markReady);
-    window.addEventListener('onEmbeddedMessagingReady', markReady);
+    const onMaximized = () => openSf(true);
+    const onMinimized = () => openSf(false);
+    const onClosed    = () => openSf(false);
+
+    const events: [string, () => void][] = [
+      ['onEmbeddedMessagingButtonCreated', onReady],
+      ['onEmbeddedMessagingWindowMaximized', onMaximized],
+      ['onEmbeddedMessagingWindowMinimized', onMinimized],
+      ['onEmbeddedMessagingWindowClosed', onClosed],
+    ];
+    events.forEach(([name, fn]) => window.addEventListener(name, fn));
+    return () => events.forEach(([name, fn]) => window.removeEventListener(name, fn));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Load Salesforce Embedded Messaging on demand, the first time the user opens the AI agent chat
+  const loadEmbeddedMessaging = () => {
+    if (document.getElementById('sf-embedded-script') || scriptLoading.current) return;
+    scriptLoading.current = true;
 
     const script = document.createElement('script');
     script.id = 'sf-embedded-script';
@@ -99,9 +136,11 @@ export function AIChatWidget({
     script.src = 'https://scapeau--innscpedev.sandbox.my.site.com/ESWChattyv21781499949497/assets/js/bootstrap.min.js';
     script.onload = () => {
       try {
-        (window as any).embeddedservice_bootstrap.settings.language = 'en_US';
-        (window as any).embeddedservice_bootstrap.settings.hideChatButtonOnLoad = true;
-        (window as any).embeddedservice_bootstrap.init(
+        const esb = (window as any).embeddedservice_bootstrap;
+        esb.settings.language = 'en_US';
+        // Do NOT set hideChatButtonOnLoad: it stops Salesforce from creating the
+        // button, which makes launchChat() throw. The button is hidden via CSS instead.
+        esb.init(
           '00DBn000005CYJD',
           'Chatty_v2',
           'https://scapeau--innscpedev.sandbox.my.site.com/ESWChattyv21781499949497',
@@ -111,7 +150,11 @@ export function AIChatWidget({
         console.error('Error loading Embedded Messaging:', err);
       }
     };
-    script.onerror = () => console.error('Failed to load Salesforce script — check the URL and network');
+    script.onerror = () => {
+      scriptLoading.current = false;
+      pendingLaunch.current = false;
+      console.error('Failed to load Salesforce script — check the URL and network');
+    };
     document.body.appendChild(script);
   };
 
@@ -120,7 +163,7 @@ export function AIChatWidget({
     if (sfReady.current) {
       doLaunch();
     } else {
-      // SF not ready yet — queue it, will fire on onEmbeddedMessagingButtonCreated
+      // Salesforce not ready yet — queue it; fires on onEmbeddedMessagingButtonCreated
       pendingLaunch.current = true;
       loadEmbeddedMessaging();
     }
@@ -154,7 +197,11 @@ export function AIChatWidget({
   const ctaBase = "flex items-center gap-3 rounded-2xl px-3 py-3 cursor-pointer";
 
   return (
-    <div className="fixed bottom-6 right-6 z-50" ref={widgetRef}>
+    <div
+      className="fixed bottom-6 right-6 z-50"
+      ref={widgetRef}
+      style={{ display: sfOpen ? 'none' : undefined }}
+    >
 
       {/* Chat window — absolute so it never moves the button */}
       {isOpen && (
