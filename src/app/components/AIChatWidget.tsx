@@ -34,6 +34,46 @@ const SF_HIDE_CSS = `
   }
 `;
 
+// Footer shown under the Salesforce chat window while a conversation is active.
+const CHAT_FOOTER_TEXT = "If Chatty gets stuck, our Scape team is here to help.";
+const CHAT_FOOTER_CSS = `
+  .sc-chat-footer {
+    display: none;
+    position: fixed;
+    right: 127px;
+    bottom: 33px;
+    width: 280px;
+    min-height: 19px;
+    padding: 0;
+    box-sizing: border-box;
+    background: #ffffff;
+    color: #6b7280;
+    font-family: "Bariol", Arial, sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.35;
+    text-align: center;
+    pointer-events: none;
+    z-index: 2147483647;
+  }
+  .sc-chat-footer.is-visible {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  @media (max-width: 600px) {
+    .sc-chat-footer {
+      right: 8px;
+      bottom: 3px;
+      width: calc(100vw - 16px);
+      min-height: 32px;
+      padding: 5px 12px;
+      font-size: 11px;
+      line-height: 1.3;
+    }
+  }
+`;
+
 function setSfOpenClass(open: boolean) {
   document.documentElement.classList.toggle(SF_OPEN_CLASS, open);
 }
@@ -63,6 +103,9 @@ export function AIChatWidget({
   const [hoveredCta, setHoveredCta]   = useState<CtaId | null>(null);
   // True while the Salesforce chat window is open; the custom launcher hides then.
   const [sfOpen, setSfOpen]           = useState(false);
+  // Footer visibility: shown while a conversation is open, hidden once it has ended.
+  const [chatOpen, setChatOpen]       = useState(false);
+  const [chatEnded, setChatEnded]     = useState(false);
   const widgetRef = useRef<HTMLDivElement>(null);
 
   const sfReady = useRef(false);
@@ -96,7 +139,7 @@ export function AIChatWidget({
     if (!document.getElementById(SF_STYLE_ID)) {
       const style = document.createElement('style');
       style.id = SF_STYLE_ID;
-      style.textContent = SF_HIDE_CSS;
+      style.textContent = SF_HIDE_CSS + CHAT_FOOTER_CSS;
       document.head.appendChild(style);
     }
 
@@ -110,15 +153,22 @@ export function AIChatWidget({
         doLaunch();
       }
     };
-    const onMaximized = () => openSf(true);
-    const onMinimized = () => openSf(false);
-    const onClosed    = () => openSf(false);
+    const showFooter = () => { setChatOpen(true); setChatEnded(false); };
+    const hideFooter = () => setChatOpen(false);
+    const endChat    = () => { setChatEnded(true); setChatOpen(false); };
+
+    const onMaximized = () => { openSf(true); showFooter(); };
+    const onMinimized = () => { openSf(false); hideFooter(); };
+    const onClosed    = () => { openSf(false); endChat(); };
 
     const events: [string, () => void][] = [
       ['onEmbeddedMessagingButtonCreated', onReady],
       ['onEmbeddedMessagingWindowMaximized', onMaximized],
       ['onEmbeddedMessagingWindowMinimized', onMinimized],
       ['onEmbeddedMessagingWindowClosed', onClosed],
+      ['onEmbeddedMessagingConversationStarted', showFooter],
+      ['onEmbeddedMessagingConversationClosed', endChat],
+      ['onEmbeddedMessagingConversationEnded', endChat],
     ];
     events.forEach(([name, fn]) => window.addEventListener(name, fn));
     return () => events.forEach(([name, fn]) => window.removeEventListener(name, fn));
@@ -197,6 +247,10 @@ export function AIChatWidget({
   const ctaBase = "flex items-center gap-3 rounded-2xl px-3 py-3 cursor-pointer";
 
   return (
+    <>
+    <div className={`sc-chat-footer${chatOpen && !chatEnded ? ' is-visible' : ''}`} aria-live="polite">
+      {CHAT_FOOTER_TEXT}
+    </div>
     <div
       className="fixed bottom-6 right-6 z-50"
       ref={widgetRef}
@@ -437,5 +491,6 @@ style={{
       </div>
 
     </div>
+    </>
   );
 }
