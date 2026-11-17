@@ -231,7 +231,11 @@ export function AIChatWidget({
   return () => clearTimeout(hideTimer);
 }, [showTooltip]);
 
-  const handleOpen = () => setIsOpen(true);
+  // Start loading Salesforce as soon as the user shows interest, so the chat opens fast.
+  const handleOpen = () => {
+    setIsOpen(true);
+    loadEmbeddedMessaging();
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -481,6 +485,8 @@ style={{
         ) : (
           <button
             onClick={handleOpen}
+            onMouseEnter={loadEmbeddedMessaging}
+            onTouchStart={loadEmbeddedMessaging}
             className="w-[62px] h-[62px] rounded-full flex items-center justify-center cursor-pointer transition-transform duration-150 hover:scale-110 active:scale-95 border-0 p-0 bg-transparent"
             style={{ filter: "drop-shadow(0px 4px 12px rgba(0,0,0,0.25))" }}
             aria-label={title}
