@@ -74,6 +74,9 @@ const CHAT_FOOTER_CSS = `
   }
 `;
 
+const MOBILE_MAX_WIDTH = 768;
+const WIDGET_BASE_BOTTOM = 24;
+
 function setSfOpenClass(open: boolean) {
   document.documentElement.classList.toggle(SF_OPEN_CLASS, open);
 }
@@ -106,6 +109,7 @@ export function AIChatWidget({
   // Footer visibility: shown while a conversation is open, hidden once it has ended.
   const [chatOpen, setChatOpen]       = useState(false);
   const [chatEnded, setChatEnded]     = useState(false);
+  const [bottomOffset, setBottomOffset] = useState(WIDGET_BASE_BOTTOM);
   const widgetRef = useRef<HTMLDivElement>(null);
 
   const sfReady = useRef(false);
@@ -139,6 +143,49 @@ export function AIChatWidget({
       handleLaunchError(err);
     }
   };
+
+  // On mobile, lift the widget above a fixed/sticky bottom navigation bar so they don't overlap.
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${MOBILE_MAX_WIDTH}px)`);
+    let raf = 0;
+
+    const measure = () => {
+      raf = 0;
+      if (!mq.matches) { setBottomOffset(WIDGET_BASE_BOTTOM); return; }
+      const vh = window.innerHeight;
+      const x = window.innerWidth * 0.25;
+      let barTop = vh;
+      for (const dy of [4, 16, 32, 48]) {
+        for (const el of document.elementsFromPoint(x, vh - dy)) {
+          if (el === document.documentElement || el === document.body) continue;
+          if (widgetRef.current?.contains(el) || el.closest('#embedded-messaging, .sc-chat-footer')) continue;
+          const position = getComputedStyle(el).position;
+          if (position !== 'fixed' && position !== 'sticky') continue;
+          const r = el.getBoundingClientRect();
+          if (r.width < window.innerWidth * 0.6 || r.height < 30 || r.height > 200 || r.bottom < vh - 60) continue;
+          barTop = Math.min(barTop, r.top);
+        }
+      }
+      setBottomOffset(barTop < vh ? Math.max(WIDGET_BASE_BOTTOM, vh - barTop + 12) : WIDGET_BASE_BOTTOM);
+    };
+
+    const schedule = () => { if (!raf) raf = requestAnimationFrame(measure); };
+    const observer = new MutationObserver(schedule);
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    window.addEventListener('scroll', schedule, true);
+    window.addEventListener('resize', schedule);
+    document.addEventListener('transitionend', schedule, true);
+    mq.addEventListener('change', schedule);
+    schedule();
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      observer.disconnect();
+      window.removeEventListener('scroll', schedule, true);
+      window.removeEventListener('resize', schedule);
+      document.removeEventListener('transitionend', schedule, true);
+      mq.removeEventListener('change', schedule);
+    };
+  }, []);
 
   // Inject the hiding CSS and listen for Salesforce window events once.
   useEffect(() => {
@@ -264,7 +311,7 @@ export function AIChatWidget({
     <div
       className="fixed bottom-6 right-6 z-50"
       ref={widgetRef}
-      style={{ display: sfOpen ? 'none' : undefined }}
+      style={{ display: sfOpen ? 'none' : undefined, bottom: bottomOffset, transition: 'bottom 0.2s ease' }}
     >
 
       {/* Chat window — absolute so it never moves the button */}
