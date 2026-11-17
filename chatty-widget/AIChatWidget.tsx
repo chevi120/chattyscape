@@ -117,20 +117,26 @@ export function AIChatWidget({
     setSfOpen(open);
   };
 
+  const handleLaunchError = (err: unknown) => {
+    console.error('launchChat failed:', err);
+    openSf(false);
+    // Called before Salesforce created its button: queue it and retry on onEmbeddedMessagingButtonCreated.
+    if (String((err as Error)?.message ?? err).includes('onEmbeddedMessagingButtonCreated')) {
+      sfReady.current = false;
+      pendingLaunch.current = true;
+    }
+  };
+
   const doLaunch = () => {
     const esb = (window as any).embeddedservice_bootstrap;
     openSf(true); // reveal the Salesforce frame before it opens
     try {
       const result = esb?.utilAPI?.launchChat?.();
       if (result && typeof result.catch === 'function') {
-        result.catch((err: unknown) => {
-          console.error('launchChat failed:', err);
-          openSf(false);
-        });
+        result.catch(handleLaunchError);
       }
     } catch (err) {
-      console.error('launchChat failed:', err);
-      openSf(false);
+      handleLaunchError(err);
     }
   };
 
