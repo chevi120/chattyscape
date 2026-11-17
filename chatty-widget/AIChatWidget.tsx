@@ -156,14 +156,24 @@ export function AIChatWidget({
       const x = window.innerWidth * 0.25;
       let barTop = vh;
       for (const dy of [4, 16, 32, 48]) {
-        for (const el of document.elementsFromPoint(x, vh - dy)) {
-          if (el === document.documentElement || el === document.body) continue;
-          if (widgetRef.current?.contains(el) || el.closest('#embedded-messaging, .sc-chat-footer')) continue;
-          const position = getComputedStyle(el).position;
-          if (position !== 'fixed' && position !== 'sticky') continue;
-          const r = el.getBoundingClientRect();
-          if (r.width < window.innerWidth * 0.6 || r.height < 30 || r.height > 200 || r.bottom < vh - 60) continue;
-          barTop = Math.min(barTop, r.top);
+        for (const hit of document.elementsFromPoint(x, vh - dy)) {
+          if (hit === document.documentElement || hit === document.body) continue;
+          if (widgetRef.current?.contains(hit) || hit.closest('#embedded-messaging, .sc-chat-footer')) continue;
+          // Walk up to the fixed/sticky ancestor (the wrapper may ignore pointer events),
+          // measuring every bar-sized element on the way.
+          const chain: Element[] = [];
+          let anchored = false;
+          for (let n: Element | null = hit; n && n !== document.body; n = n.parentElement) {
+            chain.push(n);
+            const position = getComputedStyle(n).position;
+            if (position === 'fixed' || position === 'sticky') { anchored = true; break; }
+          }
+          if (!anchored) continue;
+          for (const n of chain) {
+            const r = n.getBoundingClientRect();
+            if (r.width < window.innerWidth * 0.6 || r.height < 30 || r.height > 200 || r.bottom < vh - 60) continue;
+            barTop = Math.min(barTop, r.top);
+          }
         }
       }
       setBottomOffset(barTop < vh ? Math.max(WIDGET_BASE_BOTTOM, vh - barTop + 12) : WIDGET_BASE_BOTTOM);
